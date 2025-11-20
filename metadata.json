@@ -1,0 +1,5 @@
+{
+  "name": "Gerenciamento de Carteira",
+  "description": "A professional-grade, client-side portfolio optimization tool using Modern Portfolio Theory (Markowitz Model) to visualize the Efficient Frontier and optimize asset allocation.",
+  "requestFramePermissions": []
+}
