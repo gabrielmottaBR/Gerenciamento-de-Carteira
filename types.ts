@@ -32,7 +32,6 @@ export interface OptimizationSettings {
   strategy: StrategyType;
   backtestDate: string; // YYYY-MM-DD
   mode: 'INVESTMENT' | 'BACKTEST'; // New mode selector
-  alphaVantageKey?: string; // API Key for data fetching
 }
 
 export interface BacktestAssetResult {

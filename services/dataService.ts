@@ -44,51 +44,6 @@ const getMockData = (ticker: string, days: number): { prices: number[], dates: s
   return generateRandomWalk(days, startPrice, drift, volatility);
 };
 
-// --- Alpha Vantage Logic ---
-
-const fetchAlphaVantagePrices = async (ticker: string, apiKey: string): Promise<{ prices: number[], dates: string[] }> => {
-  // Alpha Vantage API URL
-  const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&apikey=${apiKey}&outputsize=full`;
-
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Alpha Vantage HTTP ${response.status}`);
-  
-  const data = await response.json();
-
-  // Check for API Errors or Rate Limits
-  if (data["Information"]) {
-    throw new Error("Alpha Vantage Rate Limit or Information: " + data["Information"]);
-  }
-  if (data["Error Message"]) {
-     throw new Error("Alpha Vantage Error: " + data["Error Message"]);
-  }
-  if (data["Note"]) {
-     // This is usually a rate limit warning ("Thank you for using Alpha Vantage! Our standard API call frequency...")
-     throw new Error("Alpha Vantage Rate Limit Reached");
-  }
-
-  const timeSeries = data["Time Series (Daily)"];
-  if (!timeSeries) {
-     throw new Error("No Time Series data found in Alpha Vantage response");
-  }
-
-  // AV returns dates descending (newest first). We need ascending (oldest first).
-  const sortedDates = Object.keys(timeSeries).sort(); // 'YYYY-MM-DD' sorts correctly as string
-  
-  const cleanPrices: number[] = [];
-  const cleanDates: string[] = [];
-
-  for (const date of sortedDates) {
-    const price = parseFloat(timeSeries[date]["4. close"]);
-    if (!isNaN(price)) {
-      cleanPrices.push(price);
-      cleanDates.push(date);
-    }
-  }
-
-  return { prices: cleanPrices, dates: cleanDates };
-};
-
 // --- Yahoo Finance Logic (Backup / Legacy) ---
 
 const PROXY_PROVIDERS = [
@@ -142,27 +97,16 @@ const fetchYahooPrices = async (ticker: string, period: string): Promise<{ price
 
 // --- Serial Batch Processing ---
 
-async function processInBatches(tickers: string[], period: string, apiKey?: string): Promise<PromiseSettledResult<{ prices: number[], dates: string[] }>[]> {
+async function processInBatches(tickers: string[], period: string): Promise<PromiseSettledResult<{ prices: number[], dates: string[] }>[]> {
   let allResults: PromiseSettledResult<{ prices: number[], dates: string[] }>[] = [];
   
   for (let i = 0; i < tickers.length; i++) {
     const ticker = tickers[i];
-    let promise;
-
-    if (apiKey) {
-       // Use Alpha Vantage
-       promise = fetchAlphaVantagePrices(ticker, apiKey);
-       // AV Free tier is 5 req/min. We must delay aggressively or risk failure.
-       // If the user provided a key, we assume they want real data.
-       // But making the user wait 12s per asset (2 mins for 10 assets) is bad UX.
-       // We try with a shorter delay, and if it fails, it falls back to simulation in the main loop.
-       if (i < tickers.length - 1) await new Promise(r => setTimeout(r, 2000)); 
-    } else {
-       // Fallback to Yahoo Proxy
-       promise = fetchYahooPrices(ticker, period);
-       if (i < tickers.length - 1) await new Promise(r => setTimeout(r, 1500));
-    }
-
+    
+    // Fetch Yahoo Proxy
+    const promise = fetchYahooPrices(ticker, period);
+    if (i < tickers.length - 1) await new Promise(r => setTimeout(r, 1500));
+    
     const result = await Promise.allSettled([promise]);
     allResults.push(result[0]);
   }
@@ -176,14 +120,14 @@ export interface FetchResult {
   isSimulated: boolean;
 }
 
-export const fetchAssetData = async (tickers: string[], period: string, apiKey?: string): Promise<FetchResult> => {
+export const fetchAssetData = async (tickers: string[], period: string): Promise<FetchResult> => {
   const daysMap: Record<string, number> = { '1y': 500, '3y': 1000, '5y': 1500 };
   const days = daysMap[period] || 500;
   let useSimulation = false;
   const processedAssets: AssetData[] = [];
 
   try {
-    const results = await processInBatches(tickers, period, apiKey);
+    const results = await processInBatches(tickers, period);
 
     results.forEach((res, idx) => {
       const ticker = tickers[idx];
@@ -191,7 +135,7 @@ export const fetchAssetData = async (tickers: string[], period: string, apiKey?:
         processedAssets.push(processAssetStats(ticker.toUpperCase(), res.value.prices, res.value.dates));
       } else {
         // Warning handled in UI via isSimulated flag or console
-        console.warn(`Failed to fetch ${ticker} (${apiKey ? 'AlphaVantage' : 'Yahoo'}), falling back to simulation.`);
+        console.warn(`Failed to fetch ${ticker}, falling back to simulation.`);
         useSimulation = true;
         const mock = getMockData(ticker, days);
         processedAssets.push(processAssetStats(ticker.toUpperCase(), mock.prices, mock.dates));

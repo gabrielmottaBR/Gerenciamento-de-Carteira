@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import InputSection from './components/InputSection';
@@ -78,8 +79,7 @@ const App: React.FC = () => {
       const tickers = inputs.map(i => i.ticker);
 
       // 1. Fetch Historical Data
-      // Now accepts Alpha Vantage Key from settings
-      const { data, isSimulated } = await fetchAssetData(tickers, settings.period, settings.alphaVantageKey);
+      const { data, isSimulated } = await fetchAssetData(tickers, settings.period);
       
       // 2. Override Mean Return with User Input
       const assetsWithUserReturns = data.map(asset => {
