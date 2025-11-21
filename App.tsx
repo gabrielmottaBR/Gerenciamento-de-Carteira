@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import InputSection from './components/InputSection';
@@ -38,7 +37,7 @@ const LoadingView = () => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in duration-500">
+    <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] animate-in fade-in duration-500">
       <div className="relative mb-8">
         <div className="w-20 h-20 border-4 border-slate-800 border-t-emerald-500 rounded-full animate-spin"></div>
         <div className="absolute inset-0 flex items-center justify-center font-mono font-bold text-emerald-500 text-lg">
@@ -135,30 +134,26 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] pb-20 font-sans">
+    <div className="min-h-screen bg-[#0b0f19] font-sans overflow-hidden flex flex-col">
       <Header isSimulated={isSimulatedData} onOpenTutorial={() => setIsTutorialOpen(true)} />
       
       <TutorialModal isOpen={isTutorialOpen} onClose={() => setIsTutorialOpen(false)} />
 
-      <main className="pt-6 px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 px-4 sm:px-6 lg:px-8 py-4 overflow-hidden">
         
         {isSimulatedData && viewState === ViewState.RESULTS && (
-          <div className="max-w-[1600px] mx-auto mb-6 bg-amber-900/20 border border-amber-700/50 rounded-lg p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-             <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
+          <div className="max-w-[1600px] mx-auto mb-4 bg-amber-900/20 border border-amber-700/50 rounded-lg p-2 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+             <AlertTriangle className="text-amber-500 shrink-0" size={16} />
              <div>
-                <h4 className="text-sm font-bold text-amber-500 mb-1">Aviso de Dados de Mercado</h4>
-                <p className="text-xs text-amber-200/80 leading-relaxed">
-                   Não foi possível obter todos os dados reais via API (Alpha Vantage ou Yahoo). O limite de requisições pode ter sido excedido. 
-                   O sistema está operando em <b>Modo Simulado</b> para os ativos falhos, utilizando dados gerados matematicamente (Random Walk) para garantir a execução.
-                </p>
+                <h4 className="text-xs font-bold text-amber-500">Aviso de Dados de Mercado (Simulado)</h4>
              </div>
           </div>
         )}
 
-        <div className="max-w-[1600px] mx-auto">
+        <div className="max-w-[1600px] mx-auto h-full">
           
           {viewState === ViewState.INPUT && (
-            <div className="flex flex-col animate-in fade-in zoom-in-95 duration-500">
+            <div className="h-full flex flex-col animate-in fade-in zoom-in-95 duration-500">
               <InputSection onSimulate={handleSimulation} isLoading={false} />
             </div>
           )}
@@ -168,7 +163,7 @@ const App: React.FC = () => {
           )}
 
           {viewState === ViewState.RESULTS && simulationResult && (
-             <div className="animate-in slide-in-from-bottom-4 fade-in duration-700">
+             <div className="h-full overflow-y-auto pb-20 animate-in slide-in-from-bottom-4 fade-in duration-700 custom-scrollbar">
                 <ResultsSection 
                   data={simulationResult} 
                   assets={assets} 
