@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { OptimizationSettings, UserAssetInput, StrategyType } from '../types';
-import { Play, Settings, DollarSign, Plus, Trash2, TrendingUp, ShieldCheck, Zap, BarChart2, Calendar, Wand2, History, Briefcase, Sparkles, BookOpen, Activity, MousePointer } from 'lucide-react';
-import { calculateFamaFrenchEstimation, suggestBestPortfolio } from '../services/mathService';
+import { Play, Settings, DollarSign, Plus, Trash2, TrendingUp, ShieldCheck, Zap, BarChart2, Calendar, Wand2, History, Briefcase, Sparkles, BookOpen, Activity, MousePointer, Globe, Flag } from 'lucide-react';
+import { calculateFamaFrenchEstimation, suggestBestPortfolio, formatTickerForYahoo } from '../services/mathService';
 
 interface InputSectionProps {
   onSimulate: (inputs: UserAssetInput[], settings: OptimizationSettings) => void;
@@ -34,6 +34,9 @@ const InputSection: React.FC<InputSectionProps> = ({ onSimulate, isLoading }) =>
     backtestDate: getDefaultDate(),
     mode: 'INVESTMENT', // Default mode
   });
+
+  // Interaction State
+  const [showMarketSelector, setShowMarketSelector] = useState(false);
 
   // Local state for formatted capital display
   const [capitalDisplay, setCapitalDisplay] = useState("100.000");
@@ -80,9 +83,10 @@ const InputSection: React.FC<InputSectionProps> = ({ onSimulate, isLoading }) =>
     setAssets(updatedAssets);
   };
 
-  const handleSuggestPortfolio = () => {
-    const suggestedAssets = suggestBestPortfolio();
+  const handleSuggestPortfolio = (market: 'BR' | 'US' | 'MIXED') => {
+    const suggestedAssets = suggestBestPortfolio(market);
     setAssets(suggestedAssets);
+    setShowMarketSelector(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -96,7 +100,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onSimulate, isLoading }) =>
     
     const processedAssets = validAssets.map(a => ({
       ...a,
-      ticker: a.ticker.includes('.SA') ? a.ticker : `${a.ticker}.SA`
+      ticker: formatTickerForYahoo(a.ticker)
     }));
 
     onSimulate(processedAssets, settings);
@@ -129,17 +133,65 @@ const InputSection: React.FC<InputSectionProps> = ({ onSimulate, isLoading }) =>
           <div className="flex-1 flex flex-col p-5 overflow-hidden">
             <form onSubmit={handleSubmit} className="flex-1 flex flex-col gap-5 overflow-hidden">
               
+              {/* Smart Tools Section */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wider">Ferramentas Inteligentes</label>
+                <div className="grid grid-cols-2 gap-3">
+                  
+                  {/* AI Suggestion with Market Selection Logic */}
+                  {!showMarketSelector ? (
+                    <button 
+                      type="button"
+                      onClick={() => setShowMarketSelector(true)}
+                      className="bg-amber-900/20 hover:bg-amber-900/30 border border-amber-800/50 text-amber-200 rounded-lg p-3 flex items-center justify-center gap-2 transition-colors group"
+                    >
+                      <Sparkles size={18} className="text-amber-400 group-hover:scale-110 transition-transform"/>
+                      <div className="text-left">
+                         <div className="text-sm font-bold">Sugestão de Carteira (IA)</div>
+                         <div className="text-[10px] text-amber-400/60 font-medium">Seleciona top 10 ativos eficientes</div>
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="col-span-2 grid grid-cols-4 gap-2 animate-in fade-in zoom-in-95 duration-200">
+                      <button type="button" onClick={() => handleSuggestPortfolio('BR')} className="bg-green-900/20 border border-green-800/50 hover:bg-green-900/40 rounded-lg flex flex-col items-center justify-center py-2 gap-1">
+                         <Flag size={16} className="text-green-400"/> <span className="text-xs font-bold text-green-100">Brasil</span>
+                      </button>
+                      <button type="button" onClick={() => handleSuggestPortfolio('US')} className="bg-blue-900/20 border border-blue-800/50 hover:bg-blue-900/40 rounded-lg flex flex-col items-center justify-center py-2 gap-1">
+                         <Flag size={16} className="text-blue-400"/> <span className="text-xs font-bold text-blue-100">EUA</span>
+                      </button>
+                      <button type="button" onClick={() => handleSuggestPortfolio('MIXED')} className="bg-purple-900/20 border border-purple-800/50 hover:bg-purple-900/40 rounded-lg flex flex-col items-center justify-center py-2 gap-1">
+                         <Globe size={16} className="text-purple-400"/> <span className="text-xs font-bold text-purple-100">Mista</span>
+                      </button>
+                      <button type="button" onClick={() => setShowMarketSelector(false)} className="bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-400">
+                         Cancelar
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* FF5 Predictor (Hidden if selector is active to save space) */}
+                  {!showMarketSelector && (
+                    <button 
+                      type="button"
+                      onClick={handleFamaFrenchEstimate}
+                      className="bg-purple-900/20 hover:bg-purple-900/30 border border-purple-800/50 text-purple-200 rounded-lg p-3 flex items-center justify-center gap-2 transition-colors group"
+                    >
+                      <Wand2 size={18} className="text-purple-400 group-hover:rotate-12 transition-transform"/>
+                      <div className="text-left">
+                         <div className="text-sm font-bold">Prever Retornos (FF5)</div>
+                         <div className="text-[10px] text-purple-400/60 font-medium">Estima retorno via modelo fatorial</div>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Assets List - Flex Grow to fill vertical space */}
               <div className="flex-1 flex flex-col min-h-0 border border-slate-800 rounded-lg bg-[#0b0f19]/50">
                 <div className="flex justify-between items-center p-3 border-b border-slate-800 bg-[#0b0f19]">
                   <label className="text-xs font-bold text-slate-300 uppercase flex items-center gap-2 tracking-wider">
-                    <Settings size={14} className="text-slate-500"/> Ativos ({assets.length})
+                    <Settings size={14} className="text-slate-500"/> Ativos Selecionados ({assets.length})
                   </label>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={handleSuggestPortfolio} className="text-xs bg-amber-900/30 text-amber-300 px-3 py-1.5 rounded flex items-center gap-1.5 border border-amber-800/50 hover:bg-amber-900/50 font-medium transition-colors"><Sparkles size={12} /> IA</button>
-                    <button type="button" onClick={handleFamaFrenchEstimate} className="text-xs bg-purple-900/30 text-purple-300 px-3 py-1.5 rounded flex items-center gap-1.5 border border-purple-800/50 hover:bg-purple-900/50 font-medium transition-colors"><Wand2 size={12} /> FF5</button>
-                    <button type="button" onClick={handleAddAsset} className="text-xs bg-slate-800 text-emerald-400 px-3 py-1.5 rounded flex items-center gap-1.5 border border-slate-700 hover:bg-slate-700 font-medium transition-colors"><Plus size={12} /> Add</button>
-                  </div>
+                  <button type="button" onClick={handleAddAsset} className="text-xs bg-slate-800 text-emerald-400 px-3 py-1.5 rounded flex items-center gap-1.5 border border-slate-700 hover:bg-slate-700 font-medium transition-colors"><Plus size={12} /> Adicionar</button>
                 </div>
 
                 <div className="overflow-y-auto custom-scrollbar p-3 space-y-2">
@@ -163,7 +215,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onSimulate, isLoading }) =>
 
               {/* Strategy - Horizontal Compact */}
               <div>
-                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wider">Objetivo</label>
+                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wider">Objetivo da Otimização</label>
                  <div className="grid grid-cols-3 gap-3">
                     {['MIN_RISK', 'MAX_SHARPE', 'MAX_RETURN'].map((s) => (
                         <label key={s} className={`cursor-pointer border rounded-lg p-3 flex flex-col items-center justify-center gap-1.5 transition-all ${settings.strategy === s ? (s === 'MIN_RISK' ? 'bg-blue-900/20 border-blue-500/50' : s === 'MAX_SHARPE' ? 'bg-emerald-900/20 border-emerald-500/50' : 'bg-purple-900/20 border-purple-500/50') : 'bg-[#0b0f19] border-slate-700 hover:border-slate-600'}`}>
@@ -217,10 +269,10 @@ const InputSection: React.FC<InputSectionProps> = ({ onSimulate, isLoading }) =>
         </div>
 
         {/* Right Panel: Tutorial & Concepts (Equal height to Left Panel) */}
-        <div className="lg:w-7/12 flex flex-col h-full">
-           <div className="bg-[#151b2b] border border-slate-800 rounded-xl p-8 flex-1 flex flex-col shadow-lg overflow-hidden">
+        <div className="lg:w-7/12 flex flex-col h-full min-h-0">
+           <div className="bg-[#151b2b] border border-slate-800 rounded-xl flex-1 flex flex-col shadow-lg overflow-hidden">
               
-              <div className="flex items-center gap-4 mb-6 border-b border-slate-700 pb-5 shrink-0">
+              <div className="flex items-center gap-4 p-8 border-b border-slate-700 shrink-0">
                   <div className="p-3 bg-emerald-500/10 rounded-lg text-emerald-400">
                      <BookOpen size={28} />
                   </div>
@@ -230,7 +282,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onSimulate, isLoading }) =>
                   </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-8 pr-2">
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-8 pt-6 space-y-8">
                 {/* Section 1 */}
                 <section>
                     <h3 className="text-emerald-400 font-bold text-base uppercase tracking-wider mb-4 border-l-4 border-emerald-500 pl-4">
@@ -264,7 +316,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onSimulate, isLoading }) =>
                             <div>
                                 <h4 className="font-bold text-slate-200 text-base">Defina os Ativos e Expectativas</h4>
                                 <p className="text-sm text-slate-400 mt-1 leading-relaxed">
-                                Insira os códigos das ações (ex: PETR4). O sistema busca a volatilidade histórica, mas você deve inserir o <strong>Retorno Mensal Esperado</strong> ou usar a função "FF5" para estimar via Fama-French.
+                                Insira os códigos das ações (ex: PETR4 ou AAPL). O sistema busca a volatilidade histórica, mas você deve inserir o <strong>Retorno Mensal Esperado</strong> ou usar a função "FF5" para estimar via Fama-French.
                                 </p>
                             </div>
                         </div>

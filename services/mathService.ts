@@ -129,6 +129,7 @@ export const calculateBacktest = (
     startValue += allocatedCapital;
     endValue += finalAssetValue;
 
+    // Normalize ticker for matching (remove .SA if present)
     const rawTicker = asset.ticker.replace('.SA', '');
     const userInput = userInputs.find(u => u.ticker.replace('.SA', '') === rawTicker);
     const expectedPercent = userInput ? userInput.expectedMonthlyReturn : 0;
@@ -166,136 +167,69 @@ interface FactorBetas {
   rmw: number;
   cma: number;
   avgVol: number; // Estimated monthly volatility for ranking
+  market: 'BR' | 'US';
 }
 
-// Heuristic database for B3 Universe (Simulated Scanning for ~100 assets)
+// Heuristic database for B3 Universe AND US Market
 const FAMA_FRENCH_DB: Record<string, FactorBetas> = {
-  // --- Major Banks & Financials (15) ---
-  'ITUB4': { mkt: 0.9, smb: -0.4, hml: 0.5, rmw: 0.3, cma: 0.1, avgVol: 5.5 },
-  'BBDC4': { mkt: 1.0, smb: -0.4, hml: 0.5, rmw: 0.2, cma: 0.1, avgVol: 6.0 },
-  'BBAS3': { mkt: 1.1, smb: -0.3, hml: 0.6, rmw: 0.1, cma: 0.2, avgVol: 6.5 },
-  'SANB11': { mkt: 0.9, smb: -0.3, hml: 0.4, rmw: 0.2, cma: 0.1, avgVol: 5.8 },
-  'BPAC11': { mkt: 1.4, smb: 0.2, hml: 0.1, rmw: 0.4, cma: 0.0, avgVol: 8.5 },
-  'ABCB4': { mkt: 0.8, smb: 0.1, hml: 0.4, rmw: 0.3, cma: 0.1, avgVol: 5.0 },
-  'BRSR6': { mkt: 1.0, smb: 0.0, hml: 0.5, rmw: 0.1, cma: 0.2, avgVol: 6.2 },
-  'B3SA3': { mkt: 1.1, smb: -0.1, hml: 0.0, rmw: 0.5, cma: 0.1, avgVol: 6.2 },
-  'CIEL3': { mkt: 1.0, smb: 0.1, hml: 0.1, rmw: 0.2, cma: 0.1, avgVol: 7.5 },
-  'IRBR3': { mkt: 1.5, smb: 0.2, hml: 0.1, rmw: -0.2, cma: -0.1, avgVol: 12.0 },
-  'BBSE3': { mkt: 0.7, smb: -0.2, hml: 0.2, rmw: 0.5, cma: 0.2, avgVol: 4.8 },
-  'CXSE3': { mkt: 0.7, smb: -0.1, hml: 0.3, rmw: 0.4, cma: 0.1, avgVol: 4.5 },
-  'PSSA3': { mkt: 0.8, smb: -0.1, hml: 0.1, rmw: 0.3, cma: 0.1, avgVol: 5.2 },
-  'BMGB4': { mkt: 1.2, smb: 0.3, hml: 0.4, rmw: -0.1, cma: 0.1, avgVol: 8.0 },
-  'CLSA3': { mkt: 1.3, smb: 0.4, hml: 0.0, rmw: 0.1, cma: 0.0, avgVol: 9.0 },
+  // --- BRAZIL (B3) ---
+  // Banks & Financials
+  'ITUB4': { mkt: 0.9, smb: -0.4, hml: 0.5, rmw: 0.3, cma: 0.1, avgVol: 5.5, market: 'BR' },
+  'BBDC4': { mkt: 1.0, smb: -0.4, hml: 0.5, rmw: 0.2, cma: 0.1, avgVol: 6.0, market: 'BR' },
+  'BBAS3': { mkt: 1.1, smb: -0.3, hml: 0.6, rmw: 0.1, cma: 0.2, avgVol: 6.5, market: 'BR' },
+  'BPAC11': { mkt: 1.4, smb: 0.2, hml: 0.1, rmw: 0.4, cma: 0.0, avgVol: 8.5, market: 'BR' },
+  'B3SA3': { mkt: 1.1, smb: -0.1, hml: 0.0, rmw: 0.5, cma: 0.1, avgVol: 6.2, market: 'BR' },
+  // Energy
+  'PETR4': { mkt: 1.3, smb: -0.3, hml: 0.6, rmw: 0.4, cma: 0.4, avgVol: 8.0, market: 'BR' },
+  'PRIO3': { mkt: 1.4, smb: 0.1, hml: 0.2, rmw: 0.3, cma: 0.2, avgVol: 9.0, market: 'BR' },
+  'VBBR3': { mkt: 1.0, smb: 0.1, hml: 0.2, rmw: 0.1, cma: 0.1, avgVol: 6.8, market: 'BR' },
+  // Materials
+  'VALE3': { mkt: 1.1, smb: -0.3, hml: 0.4, rmw: 0.5, cma: 0.3, avgVol: 7.5, market: 'BR' },
+  'GGBR4': { mkt: 1.2, smb: -0.1, hml: 0.4, rmw: 0.2, cma: 0.2, avgVol: 7.8, market: 'BR' },
+  'SUZB3': { mkt: 0.8, smb: -0.2, hml: 0.1, rmw: 0.4, cma: 0.1, avgVol: 6.5, market: 'BR' },
+  // Utilities
+  'ELET3': { mkt: 1.1, smb: -0.1, hml: 0.4, rmw: 0.0, cma: 0.2, avgVol: 7.0, market: 'BR' },
+  'EGIE3': { mkt: 0.6, smb: -0.2, hml: 0.2, rmw: 0.4, cma: 0.3, avgVol: 4.0, market: 'BR' },
+  'TAEE11': { mkt: 0.4, smb: -0.3, hml: 0.2, rmw: 0.3, cma: 0.1, avgVol: 3.5, market: 'BR' },
+  'CPLE6': { mkt: 0.7, smb: -0.1, hml: 0.2, rmw: 0.3, cma: 0.2, avgVol: 5.0, market: 'BR' },
+  // Consumption
+  'MGLU3': { mkt: 1.8, smb: 0.3, hml: -0.3, rmw: -0.2, cma: -0.2, avgVol: 15.0, market: 'BR' },
+  'LREN3': { mkt: 1.1, smb: 0.0, hml: 0.1, rmw: 0.2, cma: 0.1, avgVol: 8.5, market: 'BR' },
+  'ABEV3': { mkt: 0.7, smb: -0.5, hml: 0.1, rmw: 0.6, cma: 0.2, avgVol: 4.5, market: 'BR' },
+  'RADL3': { mkt: 0.6, smb: -0.1, hml: -0.2, rmw: 0.7, cma: 0.3, avgVol: 5.0, market: 'BR' },
+  'WEGE3': { mkt: 0.8, smb: -0.2, hml: -0.3, rmw: 0.7, cma: 0.2, avgVol: 5.5, market: 'BR' },
 
-  // --- Energy, Oil & Gas (15) ---
-  'PETR4': { mkt: 1.3, smb: -0.3, hml: 0.6, rmw: 0.4, cma: 0.4, avgVol: 8.0 },
-  'PETR3': { mkt: 1.3, smb: -0.3, hml: 0.6, rmw: 0.4, cma: 0.4, avgVol: 8.1 },
-  'PRIO3': { mkt: 1.4, smb: 0.1, hml: 0.2, rmw: 0.3, cma: 0.2, avgVol: 9.0 },
-  'CSAN3': { mkt: 1.1, smb: 0.0, hml: 0.1, rmw: 0.2, cma: 0.1, avgVol: 7.0 },
-  'VBBR3': { mkt: 1.0, smb: 0.1, hml: 0.2, rmw: 0.1, cma: 0.1, avgVol: 6.8 },
-  'UGPA3': { mkt: 0.9, smb: 0.0, hml: 0.2, rmw: 0.2, cma: 0.1, avgVol: 6.5 },
-  'RRRP3': { mkt: 1.6, smb: 0.3, hml: 0.1, rmw: -0.1, cma: 0.2, avgVol: 10.0 },
-  'RECV3': { mkt: 1.5, smb: 0.4, hml: 0.1, rmw: 0.1, cma: 0.1, avgVol: 9.5 },
-  'ENAT3': { mkt: 1.2, smb: 0.3, hml: 0.3, rmw: 0.1, cma: 0.1, avgVol: 8.2 },
-  'RAIZ4': { mkt: 1.0, smb: 0.1, hml: 0.1, rmw: 0.1, cma: 0.1, avgVol: 6.5 },
-  'RPAI3': { mkt: 1.3, smb: 0.4, hml: 0.1, rmw: 0.0, cma: 0.1, avgVol: 8.5 },
-  'LUPA3': { mkt: 1.4, smb: 0.5, hml: 0.2, rmw: -0.1, cma: 0.0, avgVol: 11.0 },
-  'AURE3': { mkt: 1.1, smb: 0.1, hml: 0.1, rmw: 0.2, cma: 0.1, avgVol: 7.5 },
-  'MEGA3': { mkt: 1.0, smb: 0.1, hml: 0.1, rmw: 0.3, cma: 0.1, avgVol: 6.0 },
-  'VAMO3': { mkt: 1.3, smb: 0.2, hml: 0.1, rmw: 0.3, cma: 0.0, avgVol: 8.5 },
-
-  // --- Materials & Mining (10) ---
-  'VALE3': { mkt: 1.1, smb: -0.3, hml: 0.4, rmw: 0.5, cma: 0.3, avgVol: 7.5 },
-  'CSNA3': { mkt: 1.5, smb: 0.0, hml: 0.5, rmw: 0.1, cma: 0.3, avgVol: 10.0 },
-  'GGBR4': { mkt: 1.2, smb: -0.1, hml: 0.4, rmw: 0.2, cma: 0.2, avgVol: 7.8 },
-  'GOAU4': { mkt: 1.2, smb: -0.1, hml: 0.4, rmw: 0.2, cma: 0.2, avgVol: 7.7 },
-  'USIM5': { mkt: 1.6, smb: 0.1, hml: 0.5, rmw: 0.0, cma: 0.3, avgVol: 10.5 },
-  'SUZB3': { mkt: 0.8, smb: -0.2, hml: 0.1, rmw: 0.4, cma: 0.1, avgVol: 6.5 },
-  'KLBN11': { mkt: 0.8, smb: -0.1, hml: 0.1, rmw: 0.3, cma: 0.1, avgVol: 6.2 },
-  'DXCO3': { mkt: 1.1, smb: 0.2, hml: 0.2, rmw: 0.1, cma: 0.1, avgVol: 8.0 },
-  'UNIP6': { mkt: 0.7, smb: 0.2, hml: 0.1, rmw: 0.6, cma: 0.2, avgVol: 5.5 },
-  'CMIN3': { mkt: 1.3, smb: 0.2, hml: 0.3, rmw: 0.3, cma: 0.2, avgVol: 9.0 },
-  'CBAV3': { mkt: 1.4, smb: 0.3, hml: 0.2, rmw: 0.1, cma: 0.1, avgVol: 9.5 },
-
-  // --- Utilities (15) ---
-  'ELET3': { mkt: 1.1, smb: -0.1, hml: 0.4, rmw: 0.0, cma: 0.2, avgVol: 7.0 },
-  'ELET6': { mkt: 1.1, smb: -0.1, hml: 0.4, rmw: 0.0, cma: 0.2, avgVol: 7.0 },
-  'EGIE3': { mkt: 0.6, smb: -0.2, hml: 0.2, rmw: 0.4, cma: 0.3, avgVol: 4.0 }, 
-  'TAEE11': { mkt: 0.4, smb: -0.3, hml: 0.2, rmw: 0.3, cma: 0.1, avgVol: 3.5 }, 
-  'TRPL4': { mkt: 0.5, smb: -0.2, hml: 0.3, rmw: 0.2, cma: 0.2, avgVol: 4.0 },
-  'CPLE6': { mkt: 0.7, smb: -0.1, hml: 0.2, rmw: 0.3, cma: 0.2, avgVol: 5.0 },
-  'CPFE3': { mkt: 0.6, smb: -0.1, hml: 0.2, rmw: 0.4, cma: 0.2, avgVol: 4.5 },
-  'CMIG4': { mkt: 0.9, smb: -0.1, hml: 0.3, rmw: 0.2, cma: 0.2, avgVol: 6.0 },
-  'EQTL3': { mkt: 0.8, smb: 0.0, hml: 0.1, rmw: 0.5, cma: 0.1, avgVol: 5.5 },
-  'NEOE3': { mkt: 0.7, smb: 0.0, hml: 0.2, rmw: 0.3, cma: 0.1, avgVol: 5.2 },
-  'ALUP11': { mkt: 0.5, smb: 0.0, hml: 0.2, rmw: 0.4, cma: 0.2, avgVol: 4.0 },
-  'SBSP3': { mkt: 0.9, smb: -0.1, hml: 0.3, rmw: 0.2, cma: 0.1, avgVol: 6.5 },
-  'CSMG3': { mkt: 0.8, smb: 0.1, hml: 0.2, rmw: 0.3, cma: 0.1, avgVol: 5.8 },
-  'SAPR11': { mkt: 0.7, smb: 0.0, hml: 0.2, rmw: 0.4, cma: 0.2, avgVol: 4.8 },
-  'AESB3': { mkt: 0.9, smb: 0.1, hml: 0.1, rmw: 0.2, cma: 0.1, avgVol: 6.0 },
-
-  // --- Consumption & Retail (15) ---
-  'MGLU3': { mkt: 1.8, smb: 0.3, hml: -0.3, rmw: -0.2, cma: -0.2, avgVol: 15.0 },
-  'LREN3': { mkt: 1.1, smb: 0.0, hml: 0.1, rmw: 0.2, cma: 0.1, avgVol: 8.5 },
-  'VIIA3': { mkt: 2.0, smb: 0.4, hml: -0.2, rmw: -0.4, cma: -0.3, avgVol: 18.0 },
-  'ABEV3': { mkt: 0.7, smb: -0.5, hml: 0.1, rmw: 0.6, cma: 0.2, avgVol: 4.5 },
-  'RADL3': { mkt: 0.6, smb: -0.1, hml: -0.2, rmw: 0.7, cma: 0.3, avgVol: 5.0 },
-  'ASAI3': { mkt: 0.8, smb: 0.1, hml: 0.0, rmw: 0.3, cma: 0.1, avgVol: 6.0 },
-  'CRFB3': { mkt: 0.8, smb: 0.0, hml: 0.1, rmw: 0.2, cma: 0.1, avgVol: 6.2 },
-  'NTCO3': { mkt: 1.3, smb: 0.1, hml: -0.1, rmw: 0.1, cma: 0.0, avgVol: 9.0 },
-  'ARZZ3': { mkt: 1.2, smb: 0.2, hml: 0.0, rmw: 0.4, cma: 0.1, avgVol: 8.0 },
-  'SOMA3': { mkt: 1.3, smb: 0.3, hml: -0.1, rmw: 0.2, cma: 0.0, avgVol: 9.5 },
-  'AMER3': { mkt: 2.5, smb: 0.5, hml: -0.5, rmw: -0.8, cma: -0.5, avgVol: 25.0 },
-  'PETZ3': { mkt: 1.4, smb: 0.3, hml: -0.2, rmw: 0.1, cma: 0.0, avgVol: 10.0 },
-  'SMTO3': { mkt: 1.1, smb: 0.2, hml: 0.1, rmw: 0.3, cma: 0.1, avgVol: 7.5 },
-  'MDIA3': { mkt: 0.9, smb: 0.1, hml: 0.1, rmw: 0.2, cma: 0.1, avgVol: 6.5 },
-  'ALPA4': { mkt: 1.4, smb: 0.2, hml: -0.1, rmw: 0.1, cma: 0.0, avgVol: 9.0 },
-  'GRND3': { mkt: 0.8, smb: 0.1, hml: 0.1, rmw: 0.3, cma: 0.1, avgVol: 5.5 },
-
-  // --- Agro (5) ---
-  'SLCE3': { mkt: 1.1, smb: 0.1, hml: 0.2, rmw: 0.4, cma: 0.2, avgVol: 7.5 },
-  'AGRO3': { mkt: 0.9, smb: 0.2, hml: 0.3, rmw: 0.3, cma: 0.2, avgVol: 6.8 },
-  'KEPL3': { mkt: 1.2, smb: 0.3, hml: 0.2, rmw: 0.4, cma: 0.1, avgVol: 8.5 },
-  'SOJA3': { mkt: 1.0, smb: 0.2, hml: 0.2, rmw: 0.2, cma: 0.1, avgVol: 7.0 },
-  'TTEN3': { mkt: 1.3, smb: 0.4, hml: 0.1, rmw: 0.2, cma: 0.1, avgVol: 9.0 },
-
-  // --- Real Estate / Builders (10) ---
-  'CYRE3': { mkt: 1.4, smb: 0.2, hml: 0.1, rmw: 0.2, cma: 0.1, avgVol: 9.0 },
-  'EZTC3': { mkt: 1.2, smb: 0.2, hml: 0.1, rmw: 0.3, cma: 0.2, avgVol: 8.5 },
-  'MRVE3': { mkt: 1.5, smb: 0.3, hml: 0.1, rmw: 0.1, cma: 0.1, avgVol: 10.0 },
-  'JHSF3': { mkt: 1.3, smb: 0.2, hml: 0.1, rmw: 0.2, cma: 0.1, avgVol: 9.2 },
-  'TEND3': { mkt: 1.4, smb: 0.3, hml: 0.0, rmw: 0.1, cma: 0.1, avgVol: 9.5 },
-  'EVEN3': { mkt: 1.5, smb: 0.4, hml: 0.1, rmw: 0.0, cma: 0.0, avgVol: 10.5 },
-  'MULT3': { mkt: 1.0, smb: 0.1, hml: 0.2, rmw: 0.3, cma: 0.0, avgVol: 7.0 },
-  'IGTI11': { mkt: 1.1, smb: 0.1, hml: 0.2, rmw: 0.3, cma: 0.0, avgVol: 7.2 },
-  'ALSO3': { mkt: 1.2, smb: 0.2, hml: 0.1, rmw: 0.1, cma: 0.0, avgVol: 8.0 },
-  'HBRE3': { mkt: 1.4, smb: 0.4, hml: 0.1, rmw: -0.1, cma: 0.0, avgVol: 10.0 },
-
-  // --- Health (6) ---
-  'HYPE3': { mkt: 0.7, smb: 0.0, hml: -0.1, rmw: 0.4, cma: 0.1, avgVol: 5.8 },
-  'FLRY3': { mkt: 0.8, smb: 0.1, hml: 0.0, rmw: 0.4, cma: 0.1, avgVol: 5.5 },
-  'HAPV3': { mkt: 1.4, smb: 0.2, hml: -0.2, rmw: 0.0, cma: -0.1, avgVol: 10.0 },
-  'ODPV3': { mkt: 0.7, smb: -0.1, hml: -0.1, rmw: 0.6, cma: 0.2, avgVol: 5.0 },
-  'RDOR3': { mkt: 1.0, smb: 0.1, hml: 0.0, rmw: 0.3, cma: 0.1, avgVol: 7.0 },
-  'QUAL3': { mkt: 1.6, smb: 0.4, hml: -0.1, rmw: -0.2, cma: -0.1, avgVol: 14.0 },
-
-  // --- Tech & Telecom (8) ---
-  'WEGE3': { mkt: 0.8, smb: -0.2, hml: -0.3, rmw: 0.7, cma: 0.2, avgVol: 5.5 },
-  'TOTS3': { mkt: 0.9, smb: 0.0, hml: -0.2, rmw: 0.4, cma: 0.1, avgVol: 6.8 },
-  'LWSA3': { mkt: 2.1, smb: 0.5, hml: -0.3, rmw: -0.5, cma: -0.4, avgVol: 16.0 },
-  'CASH3': { mkt: 2.4, smb: 0.6, hml: -0.4, rmw: -0.6, cma: -0.5, avgVol: 20.0 },
-  'VIVT3': { mkt: 0.6, smb: -0.3, hml: 0.3, rmw: 0.4, cma: 0.2, avgVol: 4.5 },
-  'TIMS3': { mkt: 0.7, smb: -0.2, hml: 0.3, rmw: 0.3, cma: 0.2, avgVol: 5.0 },
-  'INTB3': { mkt: 1.3, smb: 0.2, hml: -0.2, rmw: 0.4, cma: 0.0, avgVol: 8.5 },
-  'MLAS3': { mkt: 1.5, smb: 0.3, hml: -0.1, rmw: 0.1, cma: 0.0, avgVol: 10.0 },
-
-  // --- Industrial & Logistics (6) ---
-  'EMBR3': { mkt: 1.2, smb: 0.1, hml: 0.2, rmw: 0.2, cma: 0.1, avgVol: 8.0 },
-  'RENT3': { mkt: 1.1, smb: 0.1, hml: 0.1, rmw: 0.3, cma: 0.1, avgVol: 8.0 },
-  'RAIL3': { mkt: 1.0, smb: 0.1, hml: 0.1, rmw: 0.1, cma: 0.1, avgVol: 7.5 },
-  'CCRO3': { mkt: 0.9, smb: 0.0, hml: 0.2, rmw: 0.2, cma: 0.1, avgVol: 6.5 },
-  'ECOR3': { mkt: 1.0, smb: 0.1, hml: 0.2, rmw: 0.1, cma: 0.1, avgVol: 7.0 },
-  'STBP3': { mkt: 1.1, smb: 0.2, hml: 0.1, rmw: 0.2, cma: 0.1, avgVol: 7.8 }
+  // --- USA (US) ---
+  // Tech Mag 7
+  'AAPL': { mkt: 1.2, smb: -0.3, hml: -0.5, rmw: 0.6, cma: 0.1, avgVol: 6.0, market: 'US' },
+  'MSFT': { mkt: 1.1, smb: -0.4, hml: -0.4, rmw: 0.5, cma: 0.0, avgVol: 5.5, market: 'US' },
+  'GOOGL': { mkt: 1.3, smb: -0.2, hml: -0.3, rmw: 0.4, cma: -0.1, avgVol: 6.5, market: 'US' },
+  'AMZN': { mkt: 1.5, smb: -0.1, hml: -0.5, rmw: 0.3, cma: -0.3, avgVol: 7.5, market: 'US' },
+  'NVDA': { mkt: 2.0, smb: 0.1, hml: -0.6, rmw: 0.5, cma: -0.4, avgVol: 12.0, market: 'US' },
+  'TSLA': { mkt: 2.2, smb: 0.3, hml: -0.7, rmw: 0.1, cma: -0.5, avgVol: 15.0, market: 'US' },
+  'META': { mkt: 1.6, smb: -0.1, hml: -0.4, rmw: 0.4, cma: -0.2, avgVol: 9.0, market: 'US' },
+  // Finance
+  'JPM': { mkt: 1.1, smb: -0.3, hml: 0.4, rmw: 0.2, cma: 0.1, avgVol: 5.0, market: 'US' },
+  'BAC': { mkt: 1.2, smb: -0.2, hml: 0.5, rmw: 0.1, cma: 0.1, avgVol: 6.0, market: 'US' },
+  'V': { mkt: 0.9, smb: -0.3, hml: -0.1, rmw: 0.5, cma: 0.0, avgVol: 4.5, market: 'US' },
+  'MA': { mkt: 1.0, smb: -0.3, hml: -0.1, rmw: 0.5, cma: 0.0, avgVol: 5.0, market: 'US' },
+  // Retail/Consumer
+  'WMT': { mkt: 0.6, smb: -0.4, hml: 0.1, rmw: 0.4, cma: 0.2, avgVol: 3.5, market: 'US' },
+  'PG': { mkt: 0.5, smb: -0.5, hml: 0.1, rmw: 0.6, cma: 0.3, avgVol: 3.2, market: 'US' },
+  'KO': { mkt: 0.6, smb: -0.4, hml: 0.2, rmw: 0.5, cma: 0.3, avgVol: 3.0, market: 'US' },
+  'PEP': { mkt: 0.6, smb: -0.4, hml: 0.2, rmw: 0.5, cma: 0.3, avgVol: 3.2, market: 'US' },
+  'COST': { mkt: 0.8, smb: -0.2, hml: -0.1, rmw: 0.4, cma: 0.1, avgVol: 4.0, market: 'US' },
+  'MCD': { mkt: 0.7, smb: -0.3, hml: 0.1, rmw: 0.4, cma: 0.2, avgVol: 3.8, market: 'US' },
+  'NKE': { mkt: 1.1, smb: -0.1, hml: -0.2, rmw: 0.3, cma: 0.0, avgVol: 6.5, market: 'US' },
+  // Health
+  'JNJ': { mkt: 0.5, smb: -0.4, hml: 0.0, rmw: 0.4, cma: 0.3, avgVol: 3.5, market: 'US' },
+  'LLY': { mkt: 0.8, smb: -0.3, hml: -0.4, rmw: 0.5, cma: 0.1, avgVol: 6.0, market: 'US' },
+  'UNH': { mkt: 0.7, smb: -0.3, hml: 0.1, rmw: 0.3, cma: 0.2, avgVol: 4.5, market: 'US' },
+  // Energy & Industry
+  'XOM': { mkt: 1.1, smb: -0.2, hml: 0.6, rmw: 0.3, cma: 0.4, avgVol: 5.5, market: 'US' },
+  'CVX': { mkt: 1.0, smb: -0.2, hml: 0.5, rmw: 0.3, cma: 0.3, avgVol: 5.2, market: 'US' },
+  'CAT': { mkt: 1.3, smb: 0.1, hml: 0.4, rmw: 0.2, cma: 0.1, avgVol: 7.0, market: 'US' },
+  'GE': { mkt: 1.2, smb: 0.0, hml: 0.3, rmw: 0.1, cma: 0.1, avgVol: 6.5, market: 'US' },
 };
 
 const FF_CONSTANTS = {
@@ -307,10 +241,23 @@ const FF_CONSTANTS = {
   CMA: 0.25
 };
 
+// Helper to determine if a ticker is likely Brazilian (ends in digit) or US (letters only)
+export const isBrazilianTicker = (ticker: string): boolean => {
+  return /\d$/.test(ticker);
+};
+
+export const formatTickerForYahoo = (ticker: string): string => {
+  const clean = ticker.toUpperCase().trim();
+  if (isBrazilianTicker(clean) && !clean.includes('.SA')) {
+    return `${clean}.SA`;
+  }
+  return clean;
+};
+
 export const calculateFamaFrenchEstimation = (ticker: string): number => {
   const cleanTicker = ticker.replace('.SA', '').toUpperCase().trim();
   
-  const defaultBetas: FactorBetas = { mkt: 1.0, smb: 0.1, hml: 0.0, rmw: 0.0, cma: 0.0, avgVol: 8.0 };
+  const defaultBetas: FactorBetas = { mkt: 1.0, smb: 0.1, hml: 0.0, rmw: 0.0, cma: 0.0, avgVol: 8.0, market: 'BR' };
   const betas = FAMA_FRENCH_DB[cleanTicker] || defaultBetas;
 
   const expectedReturn = 
@@ -324,29 +271,31 @@ export const calculateFamaFrenchEstimation = (ticker: string): number => {
   return Number(expectedReturn.toFixed(2));
 };
 
-export const suggestBestPortfolio = (): UserAssetInput[] => {
-  const candidates = Object.entries(FAMA_FRENCH_DB).map(([ticker, betas]) => {
-    // 1. Calculate FF5 Return
-    const expectedReturn = 
-      FF_CONSTANTS.RF + 
-      (betas.mkt * FF_CONSTANTS.MKT_RF) + 
-      (betas.smb * FF_CONSTANTS.SMB) + 
-      (betas.hml * FF_CONSTANTS.HML) + 
-      (betas.rmw * FF_CONSTANTS.RMW) + 
-      (betas.cma * FF_CONSTANTS.CMA);
+export const suggestBestPortfolio = (market: 'BR' | 'US' | 'MIXED' = 'BR'): UserAssetInput[] => {
+  const candidates = Object.entries(FAMA_FRENCH_DB)
+    .filter(([_, betas]) => market === 'MIXED' || betas.market === market)
+    .map(([ticker, betas]) => {
+      // 1. Calculate FF5 Return
+      const expectedReturn = 
+        FF_CONSTANTS.RF + 
+        (betas.mkt * FF_CONSTANTS.MKT_RF) + 
+        (betas.smb * FF_CONSTANTS.SMB) + 
+        (betas.hml * FF_CONSTANTS.HML) + 
+        (betas.rmw * FF_CONSTANTS.RMW) + 
+        (betas.cma * FF_CONSTANTS.CMA);
 
-    // 2. Calculate Efficiency Score (Return / Volatility)
-    // We want High Return AND Low Volatility. 
-    // A simple ratio Return/Vol works as a proxy for Sharpe.
-    const efficiencyScore = expectedReturn / betas.avgVol;
+      // 2. Calculate Efficiency Score (Return / Volatility)
+      // We want High Return AND Low Volatility. 
+      // A simple ratio Return/Vol works as a proxy for Sharpe.
+      const efficiencyScore = expectedReturn / betas.avgVol;
 
-    return {
-      ticker,
-      expectedReturn: Number(expectedReturn.toFixed(2)),
-      avgVol: betas.avgVol,
-      score: efficiencyScore
-    };
-  });
+      return {
+        ticker,
+        expectedReturn: Number(expectedReturn.toFixed(2)),
+        avgVol: betas.avgVol,
+        score: efficiencyScore
+      };
+    });
 
   // 3. Sort by Score Descending
   candidates.sort((a, b) => b.score - a.score);
