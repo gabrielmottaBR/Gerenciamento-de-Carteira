@@ -5,8 +5,8 @@ import InputSection from './components/InputSection';
 import ResultsSection from './components/ResultsSection';
 import TutorialModal from './components/TutorialModal';
 import { fetchAssetData } from './services/dataService';
-import { calculateMatrices, runMonteCarloSimulation, calculateBacktest } from './services/mathService';
-import { AssetData, SimulationResult, ViewState, OptimizationSettings, UserAssetInput, Portfolio } from './types';
+import { calculateMatrices, runMonteCarloSimulation } from './services/mathService';
+import { AssetData, SimulationResult, ViewState, OptimizationSettings, UserAssetInput } from './types';
 import { AlertTriangle } from 'lucide-react';
 
 const LoadingView = () => {
@@ -38,15 +38,15 @@ const LoadingView = () => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] animate-in fade-in duration-500">
+    <div className="flex flex-col items-center justify-center py-20 animate-in fade-in duration-500 p-8">
       <div className="relative mb-8">
         <div className="w-20 h-20 border-4 border-slate-800 border-t-emerald-500 rounded-full animate-spin"></div>
         <div className="absolute inset-0 flex items-center justify-center font-mono font-bold text-emerald-500 text-lg">
           {Math.round(progress)}%
         </div>
       </div>
-      <h2 className="text-2xl font-bold text-slate-200 mb-2">Processando Dados...</h2>
-      <p className="text-slate-500 text-sm mb-6">Otimizando carteira e calculando fronteira eficiente</p>
+      <h2 className="text-2xl font-bold text-slate-200 mb-2 text-center">Processando Dados...</h2>
+      <p className="text-slate-500 text-sm mb-6 text-center max-w-xs">Otimizando carteira e calculando fronteira eficiente</p>
 
       {/* Animated Bar */}
       <div className="w-full max-w-md bg-slate-800 h-3 rounded-full overflow-hidden relative shadow-inner">
@@ -69,12 +69,14 @@ const App: React.FC = () => {
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
   const [isSimulatedData, setIsSimulatedData] = useState(false);
   const [currentSettings, setCurrentSettings] = useState<OptimizationSettings | null>(null);
+  const [currentInputs, setCurrentInputs] = useState<UserAssetInput[]>([]); // Store inputs for ResultsSection
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
   const handleSimulation = async (inputs: UserAssetInput[], settings: OptimizationSettings) => {
     try {
       setViewState(ViewState.LOADING);
       setCurrentSettings(settings);
+      setCurrentInputs(inputs);
       
       const tickers = inputs.map(i => i.ticker);
 
@@ -103,25 +105,7 @@ const App: React.FC = () => {
           settings.riskFreeRate
         );
 
-        // 4. Calculate Backtest ONLY if mode is BACKTEST and date is provided
-        if (settings.mode === 'BACKTEST' && settings.backtestDate) {
-           let targetPortfolio: Portfolio;
-           if (settings.strategy === 'MIN_RISK') targetPortfolio = result.minRiskPortfolio;
-           else if (settings.strategy === 'MAX_RETURN') targetPortfolio = result.maxReturnPortfolio;
-           else targetPortfolio = result.maxSharpePortfolio;
-
-           const backtestRes = calculateBacktest(
-              assetsWithUserReturns, 
-              targetPortfolio, 
-              settings.backtestDate, 
-              settings.totalCapital,
-              inputs // Pass original inputs for comparison
-           );
-           if (backtestRes) {
-             result.backtest = backtestRes;
-           }
-        }
-
+        // Note: Backtest calculation has been moved to ResultsSection to be dynamic
         setSimulationResult(result);
         setViewState(ViewState.RESULTS);
       }, 100);
@@ -134,26 +118,27 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] font-sans overflow-hidden flex flex-col">
-      <Header isSimulated={isSimulatedData} onOpenTutorial={() => setIsTutorialOpen(true)} />
+    // Standard responsive web layout
+    <div className="w-full min-h-screen bg-[#05080f] font-sans text-slate-300">
       
-      <TutorialModal isOpen={isTutorialOpen} onClose={() => setIsTutorialOpen(false)} />
-
-      <main className="flex-1 px-4 sm:px-6 lg:px-8 py-4 overflow-hidden">
+      {/* Main Container */}
+      <div className="w-full min-h-screen bg-[#0b0f19] shadow-2xl flex flex-col relative">
         
-        {isSimulatedData && viewState === ViewState.RESULTS && (
-          <div className="max-w-[1600px] mx-auto mb-4 bg-amber-900/20 border border-amber-700/50 rounded-lg p-2 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-             <AlertTriangle className="text-amber-500 shrink-0" size={16} />
-             <div>
-                <h4 className="text-xs font-bold text-amber-500">Aviso de Dados de Mercado (Simulado)</h4>
-             </div>
-          </div>
-        )}
+        <Header isSimulated={isSimulatedData} onOpenTutorial={() => setIsTutorialOpen(true)} />
+        
+        <TutorialModal isOpen={isTutorialOpen} onClose={() => setIsTutorialOpen(false)} />
 
-        <div className="max-w-[1600px] mx-auto h-full">
+        <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
           
+          {isSimulatedData && viewState === ViewState.RESULTS && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-amber-900/90 backdrop-blur border border-amber-700/50 rounded-full px-4 py-1 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+               <AlertTriangle className="text-amber-500 shrink-0" size={14} />
+               <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wide">Dados Simulados (Conexão Falhou)</span>
+            </div>
+          )}
+
           {viewState === ViewState.INPUT && (
-            <div className="h-full flex flex-col animate-in fade-in zoom-in-95 duration-500">
+            <div className="animate-in fade-in zoom-in-95 duration-500">
               <InputSection onSimulate={handleSimulation} isLoading={false} />
             </div>
           )}
@@ -163,19 +148,22 @@ const App: React.FC = () => {
           )}
 
           {viewState === ViewState.RESULTS && simulationResult && (
-             <div className="h-full overflow-y-auto pb-20 animate-in slide-in-from-bottom-4 fade-in duration-700 custom-scrollbar">
+              <div className="animate-in slide-in-from-bottom-4 fade-in duration-700 pb-8">
                 <ResultsSection 
                   data={simulationResult} 
                   assets={assets} 
                   totalCapital={currentSettings?.totalCapital || 100000}
                   targetStrategy={currentSettings?.strategy}
+                  userInputs={currentInputs}
+                  backtestDate={currentSettings?.backtestDate}
+                  mode={currentSettings?.mode}
                   onReset={() => setViewState(ViewState.INPUT)} 
                 />
-             </div>
+              </div>
           )}
 
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 };
